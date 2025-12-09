@@ -1,0 +1,66 @@
+! -----------------------------------------------------------
+! Goal:
+! Configure Dynamic NAT so PC1 (10.10.10.2) can reach Router2
+! using a NAT pool from 20.20.20.3 to 20.20.20.6.
+! The NAT process hides the LAN IP behind external addresses.
+! -----------------------------------------------------------
+
+
+! ============================
+! ROUTER 1 CONFIGURATION (NAT Router)
+! ============================
+
+! ---- Interface Setup ----
+interface e0/0
+ ip address 10.10.10.1 255.255.255.0   ! LAN side
+ no shutdown
+exit
+
+interface e0/1
+ ip address 20.20.20.1 255.255.255.0   ! WAN side
+ no shutdown
+exit
+
+! ---- NAT Inside/Outside Roles ----
+interface e0/0
+ ip nat inside
+exit
+
+interface e0/1
+ ip nat outside
+exit
+
+! ---- ACL to Match Inside LAN Addresses ----
+! Allows NAT only for 10.10.10.0/24 devices
+ip access-list standard List_NAT
+ permit 10.10.10.0 0.0.0.255
+exit
+
+! ---- NAT Pool for Dynamic Translation ----
+! Pool range used to hide inside hosts
+ip nat pool EXT 20.20.20.3 20.20.20.6 netmask 255.255.255.0
+
+! ---- Bind ACL and Pool Together ----
+! Any device in 10.10.10.0/24 will use the pool for translation
+ip nat inside source list List_NAT pool EXT
+
+
+! ============================
+! ROUTER 2 CONFIGURATION (Target Router)
+! ============================
+
+interface e0/0
+ ip address 20.20.20.2 255.255.255.0
+ no shutdown
+exit
+
+
+! ============================
+! PC1 CONFIGURATION (LAN Host)
+! ============================
+
+! PC1: should receive IP manually or via DHCP
+ip 10.10.10.2 255.255.255.0 10.10.10.1
+
+! Test NAT translation by reaching Router2
+ping 20.20.20.2
